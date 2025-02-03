@@ -11,6 +11,8 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.21.2",
+    "kafkajs": "^2.2.4",
+    "mongodb": "^6.13.0",
     "pg": "^8.13.1",
     "redis": "^4.7.0"
   }
