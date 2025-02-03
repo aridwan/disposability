@@ -6,4 +6,4 @@
   `git  clone https://github.com/aridwan/disposability.git`
 - Run this command <br>
   `docker-compose up`
-- Now check from browser `localhost:3000`
+- Now check from browser `localhost:3000/health` 

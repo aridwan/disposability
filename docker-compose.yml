@@ -10,8 +10,10 @@ services:
     environment:
       - PORT=3000
       - DATABASE_URL=postgres://postgres:password@db:5432/mydb
+      - REDIS_URL=redis://redis:6379
     depends_on:
       - db
+      - redis
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
@@ -33,6 +35,17 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+
+  redis:
+    image: redis:7
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   db_data:
