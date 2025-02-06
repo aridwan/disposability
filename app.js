@@ -36,10 +36,11 @@ async function initConnections() {
     console.log('Connected to MongoDB');
 
     // Kafka producer
-    // const kafka = new Kafka({ brokers: [KAFKA_BROKER] });
-    // kafkaProducer = kafka.producer();
-    // await kafkaProducer.connect();
-    // console.log('Connected to Kafka');
+    const kafka = new Kafka({ brokers: [KAFKA_BROKER] });
+    kafkaProducer = kafka.producer();
+    await kafkaProducer.connect();
+    console.log('Connected to Kafka');
+
   } catch (err) {
     console.error('Error initializing connections:', err);
     process.exit(1);
@@ -64,8 +65,8 @@ async function closeConnections() {
     }
 
     // Close Kafka producer
-    // await kafkaProducer.disconnect();
-    // console.log('Kafka producer connection closed.');
+    await kafkaProducer.disconnect();
+    console.log('Kafka producer connection closed.');
 
   } catch (err) {
     console.error('Error closing connections:', err);
@@ -85,17 +86,17 @@ async function handleHealthCheck(req, res) {
     const dbResult = await pool.query('SELECT NOW()');
     const redisPing = await redisClient.ping();
     const mongoStatus = mongoDb ? 'Connected' : 'Not Connected';
-    // await kafkaProducer.send({
-    //   topic: 'health-check',
-    //   messages: [{ value: 'health-check' }],
-    // });
+    await kafkaProducer.send({
+      topic: 'health-check',
+      messages: [{ value: 'health-check' }],
+    });
 
     isHealthy = true;
     res.status(200).json({
       dbStatus: `Connected: ${dbResult.rows[0].now}`,
       redisStatus: `Connected: ${redisPing}`,
       mongoStatus: mongoStatus,
-      // kafkaStatus: 'Connected',
+      kafkaStatus: 'Connected',
     });
   } catch (err) {
     console.error(err);
@@ -118,10 +119,10 @@ async function handleLivenessCheck(req, res) {
     }
 
     // Check Kafka liveness
-    // await kafkaProducer.send({
-    //   topic: 'health-check',
-    //   messages: [{ value: 'health-check' }],
-    // });
+    await kafkaProducer.send({
+      topic: 'health-check',
+      messages: [{ value: 'health-check' }],
+    });
     
     res.status(200).send('All services are alive');
   } catch (err) {
@@ -145,10 +146,10 @@ async function handleReadinessCheck(req, res) {
     }
 
     // Check if Kafka is ready
-    // await kafkaProducer.send({
-    //   topic: 'health-check',
-    //   messages: [{ value: 'health-check' }],
-    // });
+    await kafkaProducer.send({
+      topic: 'health-check',
+      messages: [{ value: 'health-check' }],
+    });
 
     isReady = true;
     res.status(200).send('Service is ready');

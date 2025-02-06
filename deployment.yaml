@@ -3,7 +3,7 @@ kind: Deployment
 metadata:
   name: my-app
 spec:
-  replicas: 3  # Scale to 3 replicas
+  replicas: 1 # Scale to 3 replicas
   selector:
     matchLabels:
       app: my-app

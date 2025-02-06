@@ -22,6 +22,16 @@ spec:
               value: zookeeper:2181
             - name: ALLOW_PLAINTEXT_LISTENER
               value: "yes"
+            - name: KAFKAJS_NO_PARTITIONER_WARNING
+              value: "1"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://0.0.0.0:9092"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka:9092"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "PLAINTEXT:PLAINTEXT"
+            - name: KAFKA_INTER_BROKER_LISTENER_NAME
+              value: "PLAINTEXT"
 ---
 apiVersion: v1
 kind: Service
