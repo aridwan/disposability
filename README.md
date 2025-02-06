@@ -9,7 +9,8 @@
   `npm install`
 - Run this command <br>
   `docker-compose up --build`
-- Now check from browser `localhost:3000/health` 
+- Now check from browser <br>
+  `localhost:3000/health` 
 
 
 ## Running through Minikube
@@ -25,6 +26,8 @@
   `./deploy.sh`
 - Forward port from minikube to host <br>
   `kubectl port-forward svc/my-app-service 3000:80`
+- Now check from browser <br>
+  `localhost:3000/health`
 
 ### Stopping all services
 - Delete all services <br>
