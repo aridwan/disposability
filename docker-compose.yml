@@ -11,7 +11,7 @@ services:
       - PORT=3000
       - DATABASE_URL=postgres://postgres:password@db:5432/mydb
       - REDIS_URL=redis://redis:6379
-      - MONGO_URL=mongodb://mongo:27017/mydb
+      - MONGO_URL=mongodb://root:password@mongo:27017/mydb?authSource=admin
       - KAFKA_BROKER=kafka:9092
     depends_on:
       - db
@@ -80,6 +80,10 @@ services:
       KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
       KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       ALLOW_PLAINTEXT_LISTENER: "yes"
+      KAFKA_LISTENERS: "PLAINTEXT://0.0.0.0:9092"
+      KAFKA_ADVERTISED_LISTENERS: "PLAINTEXT://kafka:9092"
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "PLAINTEXT:PLAINTEXT"
+      KAFKA_INTER_BROKER_LISTENER_NAME: "PLAINTEXT"
     ports:
       - "9092:9092"
     depends_on:
