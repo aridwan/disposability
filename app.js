@@ -28,11 +28,14 @@ async function initConnections() {
   try {
     // PostgreSQL connection pool
     pool = new Pool({ connectionString: DATABASE_URL });
+    pool.on('error', (err) => console.error('PostgreSQL Pool Error:', err));
+    console.log('Connected to PostgreSQL');
 
     // Redis client
     redisClient = createClient({ url: REDIS_URL });
     redisClient.on('error', (err) => console.error('Redis Client Error:', err));
     await redisClient.connect();
+    console.log('Connected to Redis');
 
     // MongoDB client
     const mongoClient = new MongoClient(MONGO_URL);
@@ -112,8 +115,8 @@ async function handleLongProcess(req, res) {
 // Simulate sleep for 10 seconds
 function simulateSleep() {
   const start = Date.now();
-  console.log('Sleeping... 3 seconds');
-  while (Date.now() - start < 3000) {
+  console.log('Sleeping... 5 seconds');
+  while (Date.now() - start < 5000) {
     // Do nothing
   }
 }
@@ -241,7 +244,7 @@ process.on('SIGTERM', async () => {
   console.log('Received SIGTERM, shutting down gracefully...');
 
   // Wait for pending operations to complete
-  const shutdownTimeout = 10000; // 10-second timeout
+  const shutdownTimeout = 30000; // 30-second timeout
   const startTime = Date.now();
   
 
@@ -267,7 +270,7 @@ process.on('SIGINT', async () => {
   console.log('Received SIGTERM, shutting down gracefully...');
 
   // Wait for pending operations to complete
-  const shutdownTimeout = 10000; // 10-second timeout
+  const shutdownTimeout = 30000; // 30-second timeout
   const startTime = Date.now();
 
   while (pendingTasks > 0 && Date.now() - startTime < shutdownTimeout) {
