@@ -16,8 +16,6 @@ const KAFKA_BROKER = process.env.KAFKA_BROKER;
 let pool, redisClient, mongoDb, kafkaProducer;
 
 var isReady = false;
-var isStarted = false;
-var isHealthy = false;
 
 var mutex = new Mutex();
 var pendingTasksMutex = new Mutex();
@@ -50,6 +48,7 @@ async function initConnections() {
     await kafkaProducer.connect();
     console.log('Connected to Kafka');
 
+    isReady = true;
   } catch (err) {
     console.error('Error initializing connections:', err);
     process.exit(1);
@@ -76,9 +75,6 @@ async function closeConnections() {
     // Close Kafka producer
     await kafkaProducer.disconnect();
     console.log('Kafka producer connection closed.');
-    isReady = false;
-    isStarted = false;
-    isHealthy = false;
   } catch (err) {
     console.error('Error closing connections:', err);
   }
@@ -115,8 +111,8 @@ async function handleLongProcess(req, res) {
 // Simulate sleep for 10 seconds
 function simulateSleep() {
   const start = Date.now();
-  console.log('Sleeping... 5 seconds');
-  while (Date.now() - start < 5000) {
+  console.log('Sleeping... 3 seconds');
+  while (Date.now() - start < 3000) {
     // Do nothing
   }
 }
@@ -159,7 +155,6 @@ async function handleHealthCheck(req, res) {
       messages: [{ value: 'health-check' }],
     });
 
-    isHealthy = true;
     res.status(200).json({
       dbStatus: `Connected: ${dbResult.rows[0].now}`,
       redisStatus: `Connected: ${redisPing}`,
@@ -219,7 +214,6 @@ async function handleReadinessCheck(req, res) {
       messages: [{ value: 'health-check' }],
     });
 
-    isReady = true;
     res.status(200).send('Service is ready');
   } catch (err) {
     console.error('Readiness check failed:', err);
@@ -232,7 +226,6 @@ function handleStartupCheck(req, res) {
   // Check if all services are connected
   if (pool && redisClient && mongoDb && kafkaProducer) {
 
-    isStarted = true;
     res.status(200).send('Service has successfully started');
   } else {
     res.status(500).send('Service failed to start');
@@ -241,10 +234,11 @@ function handleStartupCheck(req, res) {
 
 // Gracefully handle process exit to close connections
 process.on('SIGTERM', async () => {
-  console.log('Received SIGTERM, shutting down gracefully...');
+  console.log('Received SIGTERM, blocking new requests...');
+  isReady = false;
 
   // Wait for pending operations to complete
-  const shutdownTimeout = 30000; // 30-second timeout
+  const shutdownTimeout = 60000; // 60-second timeout
   const startTime = Date.now();
   
 
@@ -263,14 +257,16 @@ process.on('SIGTERM', async () => {
     console.log('All mutex locks released.');
   });
   await closeConnections();
+  console.log('Shutdown complete');
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
-  console.log('Received SIGTERM, shutting down gracefully...');
+  console.log('Received SIGINT, blocking new requests...');
+  isReady = false;
 
   // Wait for pending operations to complete
-  const shutdownTimeout = 30000; // 30-second timeout
+  const shutdownTimeout = 60000; // 60-second timeout
   const startTime = Date.now();
 
   while (pendingTasks > 0 && Date.now() - startTime < shutdownTimeout) {
@@ -288,6 +284,7 @@ process.on('SIGINT', async () => {
     console.log('All mutex locks released.');
   });
   await closeConnections();
+  console.log('Shutdown complete');
   process.exit(0);
 });
 
