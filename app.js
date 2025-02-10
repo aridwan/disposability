@@ -3,6 +3,7 @@ const { Pool } = require('pg'); // PostgreSQL client
 const { createClient } = require('redis'); // Redis client
 const { MongoClient } = require('mongodb'); // MongoDB client
 const { Kafka } = require('kafkajs'); // Kafka client
+const { Mutex } = require('async-mutex'); // Mutex for synchronizing async operations
 
 const app = express();
 
@@ -18,6 +19,8 @@ var isReady = false;
 var isStarted = false;
 var isHealthy = false;
 
+var mutex = new Mutex();
+var pendingTasksMutex = new Mutex();
 var pendingTasks = 0;
 
 // Initialize connections
@@ -89,44 +92,57 @@ app.get('/', (req, res) => res.send('Hello, World!'));
 
 // Simulate long process
 async function handleLongProcess(req, res) {
-  try {
+  await pendingTasksMutex.runExclusive(async () => {
     pendingTasks++;
+  });
+
+  try {
     const result = await pool.query('SELECT pg_sleep(10)');
-    pendingTasks--;
     res.status(200).json({ message: 'Long process completed' });
   } catch (err) {
     console.error(err);
     res.status(500).send('Long process failed');
+  } finally {
+    await pendingTasksMutex.runExclusive(async () => {
+      pendingTasks--;
+    });
   }
 }
 
 // Simulate sleep for 10 seconds
 function simulateSleep() {
   const start = Date.now();
-  pendingTasks++;
-  console.log('Sleeping... 10 seconds');
-  while (Date.now() - start < 10000) {
+  console.log('Sleeping... 3 seconds');
+  while (Date.now() - start < 3000) {
     // Do nothing
   }
-  pendingTasks--;
 }
 
 // Insert a document in MongoDB
 async function handleInsertMongo(req, res) {
-  try {
-    simulateSleep();
-    console.log('Connected successfully to MongoDB');
+  pendingTasksMutex.runExclusive(async () => {
+    pendingTasks++;
+  });
 
-    const collection = mongoDb.collection('users');
+  mutex.runExclusive(async () => {
+    try {    
+      simulateSleep();
 
-    const result = await collection.insertOne({ "test": "value" });
-    console.log('Inserted document with ID:', result.insertedId);
+      const collection = mongoDb.collection('users');
 
-    res.status(201).json({ message: `Document inserted with ID: ${result.insertedId}` });
-  } catch (err) {
-    console.error('Error inserting document:', err);
-    res.status(500).json({ error: 'Error inserting document' });
-  }
+      const result = await collection.insertOne({ "test": "value" });
+      console.log('Inserted document with ID:', result.insertedId);
+
+      res.status(201).json({ message: `Document inserted with ID: ${result.insertedId}` });
+    } catch (err) {
+      console.error('Error inserting document:', err);
+      res.status(500).json({ error: 'Error inserting document' });
+    } finally {
+      pendingTasksMutex.runExclusive(async () => {
+        pendingTasks--;  
+      });
+    }
+  });
 }
 
 // Health Check Handlers
@@ -223,20 +239,51 @@ function handleStartupCheck(req, res) {
 // Gracefully handle process exit to close connections
 process.on('SIGTERM', async () => {
   console.log('Received SIGTERM, shutting down gracefully...');
+
+  // Wait for pending operations to complete
+  const shutdownTimeout = 10000; // 10-second timeout
+  const startTime = Date.now();
+  
+
   while (pendingTasks > 0) {
     console.log(`Waiting for ${pendingTasks} task(s) to finish...`);
     await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before checking again
   }
+
+  if (pendingTasks > 0 && Date.now() - startTime < shutdownTimeout) {
+      console.log(`Forcefully shutting down after ${shutdownTimeout}ms. ${pendingTasks} tasks pending.`);
+  } else {
+      console.log('All pending tasks completed.');
+  }
+
+  await mutex.runExclusive(async () => {
+    console.log('All mutex locks released.');
+  });
   await closeConnections();
   process.exit(0);
 });
 
 process.on('SIGINT', async () => {
   console.log('Received SIGTERM, shutting down gracefully...');
-  while (pendingTasks > 0) {
+
+  // Wait for pending operations to complete
+  const shutdownTimeout = 10000; // 10-second timeout
+  const startTime = Date.now();
+
+  while (pendingTasks > 0 && Date.now() - startTime < shutdownTimeout) {
     console.log(`Waiting for ${pendingTasks} task(s) to finish...`);
     await new Promise(resolve => setTimeout(resolve, 1000)); // Wait 1 second before checking again
   }
+
+  if (pendingTasks > 0) {
+      console.log(`Forcefully shutting down after ${shutdownTimeout}ms. ${pendingTasks} tasks pending.`);
+  } else {
+      console.log('All pending tasks completed.');
+  }
+
+  await mutex.runExclusive(async () => {
+    console.log('All mutex locks released.');
+  });
   await closeConnections();
   process.exit(0);
 });
