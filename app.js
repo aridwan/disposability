@@ -149,7 +149,7 @@ async function handleHealthCheck(req, res) {
   try {
     const dbResult = await pool.query('SELECT NOW()');
     const redisPing = await redisClient.ping();
-    const mongoStatus = mongoDb ? 'Connected' : 'Not Connected';
+    const mongoStatus = await mongoDb.admin().ping() ? 'Connected' : 'Not Connected';
     await kafkaProducer.send({
       topic: 'health-check',
       messages: [{ value: 'health-check' }],
@@ -177,9 +177,7 @@ async function handleLivenessCheck(req, res) {
     await redisClient.ping();
 
     // Check MongoDB liveness
-    if (!mongoDb) {
-      throw new Error('MongoDB is not connected');
-    }
+    await mongoDb.admin().ping();
 
     // Check Kafka liveness
     await kafkaProducer.send({
@@ -204,9 +202,7 @@ async function handleReadinessCheck(req, res) {
     await redisClient.ping();
 
     // Check if MongoDB is ready
-    if (!mongoDb) {
-      throw new Error('MongoDB is not connected');
-    }
+    await mongoDb.collection('startup_log').findOne({});
 
     // Check if Kafka is ready
     await kafkaProducer.send({
@@ -222,12 +218,26 @@ async function handleReadinessCheck(req, res) {
 }
 
 // Startup Check - Ensures all services are successfully started
-function handleStartupCheck(req, res) {
-  // Check if all services are connected
-  if (pool && redisClient && mongoDb && kafkaProducer) {
+async function handleStartupCheck(req, res) {
+  try {
+    // Check MySQL connection
+    await pool.query('SELECT 1');
+
+    // Check Redis connection
+    await redisClient.ping();
+
+    // Check Kafka connection (produce a test message)
+    await kafkaProducer.send({
+      topic: 'healthcheck',
+      messages: [{ value: 'startup-check' }],
+    });
+
+    // Check MongoDB connection
+    await mongoDb.admin().command({ ping: 1 });
 
     res.status(200).send('Service has successfully started');
-  } else {
+  } catch (error) {
+    console.error('Startup check failed:', error);
     res.status(500).send('Service failed to start');
   }
 }

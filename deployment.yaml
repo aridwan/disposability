@@ -24,7 +24,7 @@ spec:
           - name: REDIS_URL
             value: redis://redis:6379
           - name: MONGO_URL
-            value: mongodb://mongo:27017/mydb
+            value: mongodb://root:password@mongo:27017/mydb?authSource=admin
           - name: KAFKA_BROKER
             value: kafka:9092
         livenessProbe:
