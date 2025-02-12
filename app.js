@@ -12,6 +12,7 @@ const DATABASE_URL = process.env.DATABASE_URL;
 const REDIS_URL = process.env.REDIS_URL;
 const MONGO_URL = process.env.MONGO_URL;
 const KAFKA_BROKER = process.env.KAFKA_BROKER;
+const FORCE_SHUTDOWN_TIMEOUT_MS = 20000; // 20 seconds timeout
 
 let pool, redisClient, mongoDb, kafkaProducer;
 
@@ -79,6 +80,19 @@ async function closeConnections() {
     console.error('Error closing connections:', err);
   }
 }
+
+// Middleware: Force Timeout for Requests
+app.use((req, res, next) => {
+  const timer = setTimeout(() => {
+    console.error(`Request timeout: ${req.method} ${req.url}`);
+    res.status(503).send('Request timed out');
+  }, FORCE_SHUTDOWN_TIMEOUT_MS);
+
+  res.on('finish', () => clearTimeout(timer));
+  res.on('close', () => clearTimeout(timer));
+
+  next();
+});
 
 // API Routes
 app.get('/health', handleHealthCheck);
